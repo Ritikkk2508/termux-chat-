@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Termux Chat</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#171a21">
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:sans-serif; background:#0f1115; color:#e6e6e6; height:100vh; display:flex; flex-direction:column; }
+  #join-screen { flex:1; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:12px; }
+  #join-screen input { padding:12px 14px; border-radius:10px; border:1px solid #333; background:#1a1d24; color:#fff; font-size:16px; width:260px; }
+  #join-screen button, #chat-form button { padding:12px 18px; border-radius:10px; border:none; background:#4f7cff; color:white; font-size:16px; }
+  #chat-screen { display:none; flex:1; flex-direction:column; height:100vh; }
+  header { padding:14px 16px; background:#171a21; border-bottom:1px solid #262a33; font-weight:600; display:flex; justify-content:space-between; align-items:center; }
+  #users { font-size:12px; color:#8a93a3; font-weight:normal; }
+  #messages { flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:8px; }
+  .msg { max-width:75%; padding:8px 12px; border-radius:12px; background:#1e2230; align-self:flex-start; }
+  .msg.me { background:#4f7cff; align-self:flex-end; }
+  .msg .name { font-size:11px; color:#9aa4b5; margin-bottom:2px; }
+  .msg.me .name { color:#d8e2ff; }
+  .msg .time { font-size:10px; color:#7a8494; margin-top:2px; }
+  .system { align-self:center; font-size:12px; color:#7a8494; font-style:italic; }
+  #chat-form { display:flex; padding:10px; gap:8px; background:#171a21; border-top:1px solid #262a33; }
+  #chat-form input { flex:1; padding:12px; border-radius:10px; border:1px solid #333; background:#1a1d24; color:#fff; font-size:16px; }
+</style>
+</head>
+<body>
+<div id="join-screen">
+  <h2>Termux Chat</h2>
+  <input id="name-input" placeholder="Enter your name" autocomplete="off" />
+  <button id="join-btn">Join Chat</button>
+</div>
+<div id="chat-screen">
+  <header><span>Termux Chat</span><span id="users"></span></header>
+  <div id="messages"></div>
+  <form id="chat-form">
+    <input id="msg-input" placeholder="Type a message..." autocomplete="off" />
+    <button type="submit">Send</button>
+  </form>
+</div>
+<script>
+  let ws; let myName = '';
+  const joinScreen = document.getElementById('join-screen');
+  const chatScreen = document.getElementById('chat-screen');
+  const nameInput = document.getElementById('name-input');
+  const joinBtn = document.getElementById('join-btn');
+  const messagesEl = document.getElementById('messages');
+  const chatForm = document.getElementById('chat-form');
+  const msgInput = document.getElementById('msg-input');
+  const usersEl = document.getElementById('users');
+
+  function connect() {
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${protocol}//${location.host}`);
+    ws.onopen = () => ws.send(JSON.stringify({ type: 'join', name: myName }));
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'system') addSystemMessage(data.text);
+      else if (data.type === 'message') addChatMessage(data.name, data.text, data.time);
+      else if (data.type === 'userlist') usersEl.textContent = data.users.join(', ');
+    };
+    ws.onclose = () => addSystemMessage('Disconnected from server');
+  }
+
+  function addSystemMessage(text) {
+    const div = document.createElement('div');
+    div.className = 'system';
+    div.textContent = text;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function addChatMessage(name, text, time) {
+    const div = document.createElement('div');
+    div.className = 'msg' + (name === myName ? ' me' : '');
+    div.innerHTML = `<div class="name">${escapeHtml(name)}</div>${escapeHtml(text)}<div class="time">${time}</div>`;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function escapeHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  joinBtn.addEventListener('click', () => {
+    const name = nameInput.value.trim();
+    if (!name) return;
+    myName = name;
+    joinScreen.style.display = 'none';
+    chatScreen.style.display = 'flex';
+    connect();
+  });
+
+  nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') joinBtn.click(); });
+
+  chatForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const text = msgInput.value.trim();
+    if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type: 'message', text }));
+    msgInput.value = '';
+  });
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>
