@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.onrender.termux_chat_1740.twa",
+    "sha256_cert_fingerprints": ["8C:77:6F:6E:4F:DA:9A:81:0A:3F:5F:94:75:55:12:E3:9E:09:44:F9:1C:BD:AF:8B:75:98:A1:90:49:EA:19:4B"]
+  }
+}]
